@@ -3,6 +3,9 @@ using Figgle.Fonts;
 using NAudio.Wave;
 using System.Collections.Concurrent;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Timers;
 
 namespace XTLZ_Piano;
 
@@ -10,6 +13,8 @@ internal class Program
 {
     // 使用并发字典来管理多个播放器，允许多个音符同时播放
     private static readonly ConcurrentDictionary<int, WaveOutEvent> activePlayers = new();
+    // 用于自动演奏的取消令牌
+    private static CancellationTokenSource? autoPlayCancellation;
 
     static void Main(string[] args)
     {
@@ -32,6 +37,9 @@ internal class Program
                     PlayMode();
                     break;
                 case "2":
+                    PlayFromNotationFile();
+                    break;
+                case "3":
                     exitProgram = true;
                     break;
                 default:
@@ -47,7 +55,8 @@ internal class Program
     {
         Console.WriteLine("========== 主菜单 ==========");
         Console.WriteLine("1. 开始演奏");
-        Console.WriteLine("2. 退出程序");
+        Console.WriteLine("2. 读取简谱文件并自动演奏");
+        Console.WriteLine("3. 退出程序");
         Console.Write("请选择（输入数字）: ");
     }
 
@@ -138,5 +147,149 @@ internal class Program
             kvp.Value.Dispose();
         }
         activePlayers.Clear();
+    }
+
+    static void PlayFromNotationFile()
+    {
+        Console.Write("\n请输入简谱文件路径（例如：D:\\1.txt）: ");
+        string? filePath = Console.ReadLine()?.Trim();
+        
+        if (string.IsNullOrEmpty(filePath))
+        {
+            Console.WriteLine("文件路径不能为空。");
+            return;
+        }
+
+        if (!File.Exists(filePath))
+        {
+            Console.WriteLine($"文件不存在: {filePath}");
+            return;
+        }
+
+        try
+        {
+            string content = File.ReadAllText(filePath).Trim();
+            if (string.IsNullOrEmpty(content))
+            {
+                Console.WriteLine("文件内容为空。");
+                return;
+            }
+
+            Console.WriteLine($"读取到简谱: {content}");
+            Console.WriteLine("开始自动演奏...（按任意键停止）");
+            
+            // 创建取消令牌
+            autoPlayCancellation = new CancellationTokenSource();
+            var token = autoPlayCancellation.Token;
+            
+            // 启动自动演奏任务
+            Task.Run(() => AutoPlayNotation(content, token), token);
+            
+            // 等待用户按键停止
+            Console.ReadKey(intercept: true);
+            
+            // 取消自动演奏
+            autoPlayCancellation.Cancel();
+            autoPlayCancellation.Dispose();
+            autoPlayCancellation = null;
+            
+            // 停止所有播放器
+            StopAllPlayers();
+            Console.WriteLine("\n自动演奏已停止。");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"读取或播放简谱时出错: {ex.Message}");
+        }
+    }
+
+    static async Task AutoPlayNotation(string notation, CancellationToken cancellationToken)
+    {
+        const int noteDuration = 500; // 每个音符播放时长（毫秒）
+        
+        foreach (char c in notation)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                break;
+                
+            if (c >= '1' && c <= '7')
+            {
+                int note = c - '0';
+                AutoPlayNote(note, noteDuration);
+                Console.Write($"{note}");
+            }
+            else if (c == ' ')
+            {
+                // 空格表示休止符，等待一段时间
+                Console.Write(" ");
+            }
+            else
+            {
+                // 忽略无效字符
+                continue;
+            }
+            
+            // 等待音符时长，但允许被取消
+            try
+            {
+                await Task.Delay(noteDuration, cancellationToken);
+            }
+            catch (TaskCanceledException)
+            {
+                break;
+            }
+        }
+    }
+
+    static void AutoPlayNote(int note, int durationMilliseconds)
+    {
+        string fileName = $"XTLZ-{note}.mp3";
+        string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, fileName);
+        
+        if (!File.Exists(filePath))
+            return;
+
+        try
+        {
+            var audioFile = new AudioFileReader(filePath);
+            var player = new WaveOutEvent();
+            player.Init(audioFile);
+            
+            // 添加到活跃播放器字典（使用负号区分自动播放，避免与手动播放冲突）
+            int autoPlayKey = -note; // 使用负数作为键，避免与手动播放的正数键冲突
+            activePlayers[autoPlayKey] = player;
+            
+            // 播放完成后自动释放资源并从字典移除
+            player.PlaybackStopped += (sender, e) =>
+            {
+                audioFile.Dispose();
+                player.Dispose();
+                activePlayers.TryRemove(autoPlayKey, out _);
+            };
+            
+            player.Play();
+            
+            // 设置定时器在指定时间后停止播放
+            var timer = new System.Timers.Timer(durationMilliseconds);
+            timer.Elapsed += (sender, e) =>
+            {
+                timer.Stop();
+                timer.Dispose();
+                try
+                {
+                    player.Stop();
+                }
+                catch
+                {
+                    // 忽略停止时的异常
+                }
+            };
+            timer.AutoReset = false;
+            timer.Start();
+        }
+        catch
+        {
+            // 忽略播放错误
+        }
     }
 }
