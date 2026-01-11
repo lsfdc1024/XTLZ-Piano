@@ -206,7 +206,6 @@ internal class Program
             // 调试信息
             string debugMessage = $"[调试] 音符: {note}, 文件: {fileName}";
             WriteDebugLog(debugMessage);
-            Console.Write($"{note}");
             
             // 播放完成事件处理
             player.PlaybackStopped += (sender, e) =>
@@ -304,12 +303,11 @@ internal class Program
             {
                 int note = c - '0';
                 AutoPlayNote(note, noteDuration);
-                Console.Write($"{note}");
             }
             else if (c == ' ')
             {
                 // 空格表示休止符，等待一段时间
-                Console.Write(" ");
+                // 静默处理，不输出
             }
             else
             {
@@ -412,7 +410,6 @@ internal class Program
             else if (pianoKeyMapping.TryGetValue(key.Key, out int noteNumber))
             {
                 PlayPitchShiftedNote(noteNumber);
-                Console.Write($"{GetNoteName(noteNumber)} ");
             }
             else
             {
@@ -600,10 +597,7 @@ internal class Program
                 string timestamp = DateTime.Now.ToString("HH:mm:ss.fff");
                 string logMessage = $"[{timestamp}] {message}";
                 
-                File.AppendAllText(debugLogFilePath, logMessage + Environment.NewLine);
-                
-                // 同时输出到控制台
-                Console.Write(logMessage);
+                File.AppendAllText(debugLogFilePath, logMessage + Environment.NewLine, Encoding.UTF8);
             }
         }
         catch
@@ -624,13 +618,13 @@ internal class Program
             debugLogFilePath = Path.Combine(baseDir, $"xtlz_piano_debug_{DateTime.Now:yyyyMMdd_HHmmss}.log");
             
             // 创建初始日志消息
-            File.WriteAllText(debugLogFilePath, $"=== 雪田梨子吟唱器调试日志 {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n");
+            File.WriteAllText(debugLogFilePath, $"=== 雪田梨子吟唱器调试日志 {DateTime.Now:yyyy-MM-dd HH:mm:ss} ===\n", Encoding.UTF8);
             
             // 启动新的 PowerShell 窗口来实时显示日志
             var processStartInfo = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"-NoExit -Command \"Get-Content '{debugLogFilePath}' -Wait\"",
+                Arguments = $"-NoExit -Command \"Get-Content '{debugLogFilePath}' -Wait -Encoding UTF8\"",
                 UseShellExecute = true,
                 WorkingDirectory = baseDir
             };
