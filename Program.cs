@@ -426,24 +426,11 @@ internal class Program
         string mappingFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "映射表.txt");
         if (File.Exists(mappingFilePath))
         {
-            Console.WriteLine("\n========== 键盘映射表（来自文件） ==========");
+            Console.WriteLine("\n========== 键盘映射表 ==========");
             string content = File.ReadAllText(mappingFilePath);
             Console.WriteLine(content);
         }
-        else
-        {
-            Console.WriteLine("\n========== 键盘映射表 ==========");
-            Console.WriteLine("低音区 (C3-B3):");
-            Console.WriteLine(" 白键: Z(C3) X(D3) C(E3) V(F3) B(G3) N(A3) M(B3)");
-            Console.WriteLine(" 黑键: A(C#3) S(D#3) D(F#3) F(G#3) G(A#3)");
-            Console.WriteLine("\n中音区 (C4-B4, 中央C):");
-            Console.WriteLine(" 白键: H(C4) J(D4) K(E4) L(F4) Q(G4) W(A4) E(B4)");
-            Console.WriteLine(" 黑键: R(C#4) T(D#4) Y(F#4) U(G#4) I(A#4)");
-            Console.WriteLine("\n高音区 (C5-B5):");
-            Console.WriteLine(" 白键: O(C5) P(D5) 1(E5) 2(F5) 3(G5) 4(A5) 5(B5)");
-            Console.WriteLine(" 黑键: 6(C#5) 7(D#5) 8(F#5) 9(G#5) 0(A#5)");
-            Console.WriteLine($"\n提示：可以在程序目录创建 映射表.txt 文件来自定义映射表显示。");
-        }
+        
     }
 
     static string GetNoteName(int noteNumber)
@@ -501,24 +488,24 @@ internal class Program
     
     static string GetPitchedNoteFilePath(int noteNumber)
     {
-        // 音符文件存储在项目根目录的 Notes 文件夹中
+        // 音符文件存储在编译后程序目录的 Notes 文件夹中
         // 文件名格式：XTLZ-{音符名}.mp3，例如：XTLZ-C3.mp3, XTLZ-C#3.mp3
-        string projectRoot = GetProjectRootDirectory();
-        string notesDir = Path.Combine(projectRoot, "Notes");
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string notesDir = Path.Combine(baseDir, "Notes");
         string noteName = GetNoteName(noteNumber);
         return Path.Combine(notesDir, $"XTLZ-{noteName}.mp3");
     }
 
     static void EnsurePitchShiftedNotesGenerated()
     {
-        // 使用项目根目录的 Notes 文件夹
-        string projectRoot = GetProjectRootDirectory();
-        string notesDir = Path.Combine(projectRoot, "Notes");
+        // 使用编译后程序目录的 Notes 文件夹
+        string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+        string notesDir = Path.Combine(baseDir, "Notes");
         
         if (!Directory.Exists(notesDir))
         {
             Console.WriteLine($"警告：音符文件夹不存在: {notesDir}");
-            Console.WriteLine("请确保在项目根目录下创建 Notes 文件夹，并放入所有音符文件。");
+            Console.WriteLine("请确保在编译后程序目录下创建 Notes 文件夹，并放入所有音符文件。");
             Console.WriteLine($"预期位置: {notesDir}");
             return;
         }
